@@ -11,9 +11,10 @@ import (
 	"github.com/eularixs/arch-diff/internal/model"
 )
 
-// Markdown renders a diff result as the PR-comment report. When the result is
-// empty it returns a single-line "no structural change" report.
-func Markdown(r diff.Result, prRef string) string {
+// Markdown renders a diff result as the PR-comment report, followed by a mermaid
+// subgraph of the changed region. When the result is empty it returns a
+// single-line "no structural change" report.
+func Markdown(r diff.Result, prRef string, head *model.Graph) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Arch-diff: %s\n\n", prRef)
 	if r.Empty() {
@@ -39,6 +40,87 @@ func Markdown(r diff.Result, prRef string) string {
 	section(&b, "Changed (body)", r.Changed)
 	section(&b, "New node", r.Added)
 	section(&b, "Removed node", r.Removed)
+	b.WriteString(mermaid(r, head))
+	return b.String()
+}
+
+// shortLabel trims a node ID to its package-tail plus receiver.method.
+func shortLabel(id string) string {
+	if i := strings.LastIndex(id, "/"); i >= 0 {
+		return id[i+1:]
+	}
+	return id
+}
+
+// mermaid draws the changed region: every node touched by the diff, the new
+// (solid) and removed (dotted) layer-crossing edges between them, with newly
+// dead, revived, changed, added, and removed nodes styled distinctly.
+func mermaid(r diff.Result, head *model.Graph) string {
+	involved := map[string]string{} // id -> class
+	set := func(id, class string) {
+		if _, ok := involved[id]; !ok {
+			involved[id] = class
+		}
+	}
+	for _, id := range r.NewlyDead {
+		set(id, "dead")
+	}
+	for _, id := range r.Revived {
+		set(id, "revived")
+	}
+	for _, id := range r.Changed {
+		set(id, "changed")
+	}
+	for _, id := range r.Added {
+		set(id, "added")
+	}
+	for _, id := range r.Removed {
+		set(id, "removed")
+	}
+	for _, e := range r.NewCrossing {
+		set(e.From, "")
+		set(e.To, "")
+	}
+	for _, e := range r.RemovedCrossing {
+		set(e.From, "")
+		set(e.To, "")
+	}
+	if len(involved) == 0 {
+		return ""
+	}
+
+	// Stable mermaid node ids.
+	ids := make([]string, 0, len(involved))
+	for id := range involved {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	nid := map[string]string{}
+	for i, id := range ids {
+		nid[id] = fmt.Sprintf("n%d", i)
+	}
+
+	var b strings.Builder
+	b.WriteString("```mermaid\ngraph LR\n")
+	for _, id := range ids {
+		line := fmt.Sprintf("  %s[\"%s\"]", nid[id], shortLabel(id))
+		if c := involved[id]; c != "" {
+			line += ":::" + c
+		}
+		b.WriteString(line + "\n")
+	}
+	for _, e := range r.NewCrossing {
+		fmt.Fprintf(&b, "  %s --> %s\n", nid[e.From], nid[e.To])
+	}
+	for _, e := range r.RemovedCrossing {
+		fmt.Fprintf(&b, "  %s -.-> %s\n", nid[e.From], nid[e.To])
+	}
+	b.WriteString("  classDef dead fill:#3a1212,stroke:#f87171,color:#fca5a5;\n")
+	b.WriteString("  classDef revived fill:#0f2a1a,stroke:#34d399,color:#6ee7b7;\n")
+	b.WriteString("  classDef changed fill:#2a230f,stroke:#fbbf24,color:#fcd34d;\n")
+	b.WriteString("  classDef added fill:#10233a,stroke:#60a5fa,color:#93c5fd;\n")
+	b.WriteString("  classDef removed fill:#241024,stroke:#a78bfa,color:#c4b5fd;\n")
+	b.WriteString("```\n")
 	return b.String()
 }
 

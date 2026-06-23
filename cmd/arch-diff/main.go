@@ -58,7 +58,7 @@ func run(repo, base, head, cfgPath string, deadAudit bool) error {
 	}
 
 	res := diff.Diff(baseG, headG, cfg)
-	fmt.Println(render.Markdown(res, head))
+	fmt.Println(render.Markdown(res, head, headG))
 	return nil
 }
 
