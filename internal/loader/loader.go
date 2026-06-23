@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	archview "github.com/eularixs/archview"
@@ -60,6 +63,38 @@ var layerMap = map[string]string{
 	"repository": model.LayerRepo,
 }
 
+// ignored reports whether a file path matches any ignore glob (test, mock,
+// vendor, generated). Such files never appear as nodes, roots, or in the dead set.
+func ignored(relFile string, cfg config.Config) bool {
+	for _, g := range cfg.Ignore {
+		if config.MatchGlob(g, relFile) {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveLayer picks an arch-diff layer for a file. A config glob match wins
+// (PRD §11: layers are resolved from config); otherwise the archview-classified
+// layer is mapped through. relDir is the file's directory, relative to the
+// module root, slash-separated.
+func resolveLayer(relDir string, cfg config.Config, archviewLayer string) string {
+	names := make([]string, 0, len(cfg.Layers))
+	for name := range cfg.Layers {
+		names = append(names, name)
+	}
+	sort.Strings(names) // deterministic on overlapping globs
+	for _, name := range names {
+		if config.MatchGlob(cfg.Layers[name], relDir) {
+			return name
+		}
+	}
+	if m, ok := layerMap[archviewLayer]; ok {
+		return m
+	}
+	return archviewLayer
+}
+
 // BuildGraph loads wt with archview's Raw (unpruned) graph and maps it into a
 // model.Graph: every function is a node, call edges are static, implements edges
 // are interface, and a function targeted by a route edge (or named main) is a
@@ -76,23 +111,38 @@ func BuildGraph(wt Worktree, cfg config.Config) (*model.Graph, error) {
 		if n.Kind != "func" {
 			continue // endpoint nodes are route markers, surfaced via edges below
 		}
-		layer := n.Layer
-		if m, ok := layerMap[layer]; ok {
-			layer = m
+		relFile := filepath.ToSlash(n.File)
+		if rel, err := filepath.Rel(wt.Dir, n.File); err == nil {
+			relFile = filepath.ToSlash(rel)
 		}
-		node := model.Node{ID: n.ID, Layer: layer, Root: n.Func == "main"}
+		if ignored(relFile, cfg) {
+			continue
+		}
+		relDir := path.Dir(relFile)
+		node := model.Node{
+			ID:    n.ID,
+			Layer: resolveLayer(relDir, cfg, n.Layer),
+			Hash:  n.Hash,
+			Root:  cfg.Roots.Main && n.Func == "main",
+		}
 		g.Nodes[n.ID] = node
 	}
 	for _, e := range ag.Edges {
 		switch e.Kind {
 		case "route":
 			// endpoint -> handler: the handler func is a root.
-			if h, ok := g.Nodes[e.To]; ok {
-				h.Root = true
-				g.Nodes[e.To] = h
+			if cfg.Roots.Routes {
+				if h, ok := g.Nodes[e.To]; ok {
+					h.Root = true
+					g.Nodes[e.To] = h
+				}
 			}
 		case "implements":
-			g.Edges = append(g.Edges, model.Edge{From: e.From, To: e.To, Kind: model.EdgeInterface})
+			if _, ok := g.Nodes[e.From]; ok {
+				if _, ok := g.Nodes[e.To]; ok {
+					g.Edges = append(g.Edges, model.Edge{From: e.From, To: e.To, Kind: model.EdgeInterface})
+				}
+			}
 		case "call", "dispatch":
 			if _, ok := g.Nodes[e.From]; ok {
 				if _, ok := g.Nodes[e.To]; ok {

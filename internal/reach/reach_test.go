@@ -27,3 +27,33 @@ func TestComputeReachability(t *testing.T) {
 		t.Fatalf("D should be dead (no path from root)")
 	}
 }
+
+func TestRootsExportedAndKeep(t *testing.T) {
+	g := &model.Graph{Nodes: map[string]model.Node{
+		"m/pkg.(*H).Create":    {ID: "m/pkg.(*H).Create"},   // exported
+		"m/pkg.(*H).validate":  {ID: "m/pkg.(*H).validate"}, // unexported
+		"m/internal/jobs.Register": {ID: "m/internal/jobs.Register"},
+	}}
+	// exported_api: exported funcs are roots.
+	cfg := config.Default()
+	cfg.Roots = config.Roots{ExportedAPI: true}
+	roots := Roots(g, cfg)
+	if !contains(roots, "m/pkg.(*H).Create") || contains(roots, "m/pkg.(*H).validate") {
+		t.Fatalf("exported_api roots wrong: %v", roots)
+	}
+	// keep: pattern matches an ID carrying the module path.
+	cfg2 := config.Default()
+	cfg2.Roots = config.Roots{Keep: []string{"internal/jobs.Register"}}
+	if r := Roots(g, cfg2); !contains(r, "m/internal/jobs.Register") {
+		t.Fatalf("keep should match jobs.Register, got %v", r)
+	}
+}
+
+func contains(ss []string, v string) bool {
+	for _, s := range ss {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}

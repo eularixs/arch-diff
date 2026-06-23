@@ -4,9 +4,11 @@ package render
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/eularixs/arch-diff/internal/diff"
+	"github.com/eularixs/arch-diff/internal/model"
 )
 
 // Markdown renders a diff result as the PR-comment report. When the result is
@@ -49,4 +51,42 @@ func section(b *strings.Builder, title string, ids []string) {
 		fmt.Fprintf(b, "  %s\n", id)
 	}
 	b.WriteString("\n")
+}
+
+// DeadAudit renders every unreachable node in g, grouped by layer (PRD §8.2).
+func DeadAudit(g *model.Graph, ref string) string {
+	byLayer := map[string][]string{}
+	for id, n := range g.Nodes {
+		if !g.Reachable[id] {
+			layer := n.Layer
+			if layer == "" {
+				layer = "(unclassified)"
+			}
+			byLayer[layer] = append(byLayer[layer], id)
+		}
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Arch-diff dead audit: %s\n\n", ref)
+	if len(byLayer) == 0 {
+		b.WriteString("No dead code: every node is reachable from a root.\n")
+		return b.String()
+	}
+	layers := make([]string, 0, len(byLayer))
+	for l := range byLayer {
+		layers = append(layers, l)
+	}
+	sort.Strings(layers)
+	total := 0
+	for _, l := range layers {
+		ids := byLayer[l]
+		sort.Strings(ids)
+		total += len(ids)
+		fmt.Fprintf(&b, "%s (%d)\n", l, len(ids))
+		for _, id := range ids {
+			fmt.Fprintf(&b, "  %s\n", id)
+		}
+		b.WriteString("\n")
+	}
+	fmt.Fprintf(&b, "%d dead node(s).\n", total)
+	return b.String()
 }

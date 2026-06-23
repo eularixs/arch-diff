@@ -4,6 +4,9 @@
 package reach
 
 import (
+	"strings"
+	"unicode"
+
 	"github.com/eularixs/arch-diff/internal/config"
 	"github.com/eularixs/arch-diff/internal/model"
 )
@@ -16,11 +19,41 @@ import (
 func Roots(g *model.Graph, cfg config.Config) []string {
 	var roots []string
 	for id, n := range g.Nodes {
-		if n.Root {
-			roots = append(roots, id)
+		switch {
+		case n.Root:
+			// routes / main, already marked by the loader.
+		case cfg.Roots.ExportedAPI && exported(id):
+			// library mode: an exported symbol is an entrypoint by design.
+		case keepMatch(id, cfg.Roots.Keep):
+			// reflective/known entrypoint kept alive by config.
+		default:
+			continue
 		}
+		roots = append(roots, id)
 	}
 	return roots
+}
+
+// exported reports whether the node's function name is exported (capitalized).
+// The name is the final dotted segment of the ID, e.g. "(*H).Create" -> "Create".
+func exported(id string) bool {
+	name := id[strings.LastIndex(id, ".")+1:]
+	for _, r := range name {
+		return unicode.IsUpper(r)
+	}
+	return false
+}
+
+// keepMatch reports whether the node ID matches any keep pattern. Patterns are
+// doublestar globs over the node ID; a "**/" prefix is tried so a relative
+// pattern (internal/jobs/*.Register) matches an ID carrying the module path.
+func keepMatch(id string, keep []string) bool {
+	for _, pat := range keep {
+		if config.MatchGlob(pat, id) || config.MatchGlob("**/"+pat, id) {
+			return true
+		}
+	}
+	return false
 }
 
 // Compute fills g.Reachable with a BFS from roots over the edge set.

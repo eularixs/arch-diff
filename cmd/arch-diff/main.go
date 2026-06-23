@@ -11,6 +11,7 @@ import (
 	"github.com/eularixs/arch-diff/internal/config"
 	"github.com/eularixs/arch-diff/internal/diff"
 	"github.com/eularixs/arch-diff/internal/loader"
+	"github.com/eularixs/arch-diff/internal/model"
 	"github.com/eularixs/arch-diff/internal/reach"
 	"github.com/eularixs/arch-diff/internal/render"
 )
@@ -41,35 +42,45 @@ func run(repo, base, head, cfgPath string, deadAudit bool) error {
 		return err
 	}
 
-	headWt, cleanupHead, err := loader.AddWorktree(repo, head)
+	headG, err := buildAndReach(repo, head, cfg)
 	if err != nil {
 		return err
 	}
-	defer cleanupHead()
-	headG, err := loader.BuildGraph(headWt, cfg)
-	if err != nil {
-		return err
-	}
-	reach.Compute(headG, reach.Roots(headG, cfg))
 
 	if deadAudit {
-		// TODO(M3): list every unreachable node grouped by layer, no diff.
-		fmt.Println("## Arch-diff dead audit\n\n(not implemented — M3)")
+		fmt.Println(render.DeadAudit(headG, head))
 		return nil
 	}
 
-	baseWt, cleanupBase, err := loader.AddWorktree(repo, base)
+	baseG, err := buildAndReach(repo, base, cfg) // TODO(M5): served from SHA cache
 	if err != nil {
 		return err
 	}
-	defer cleanupBase()
-	baseG, err := loader.BuildGraph(baseWt, cfg) // TODO(M5): served from SHA cache
-	if err != nil {
-		return err
-	}
-	reach.Compute(baseG, reach.Roots(baseG, cfg))
 
 	res := diff.Diff(baseG, headG, cfg)
 	fmt.Println(render.Markdown(res, head))
 	return nil
+}
+
+// buildAndReach checks out ref, builds its graph, and computes reachability.
+// It warns loudly when the root set is empty — the main dead-code failure mode
+// (PRD §15): with no roots, every node looks dead.
+func buildAndReach(repo, ref string, cfg config.Config) (*model.Graph, error) {
+	wt, cleanup, err := loader.AddWorktree(repo, ref)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+	g, err := loader.BuildGraph(wt, cfg)
+	if err != nil {
+		return nil, err
+	}
+	roots := reach.Roots(g, cfg)
+	if len(roots) == 0 {
+		fmt.Fprintf(os.Stderr,
+			"arch-diff: warning: no roots resolved for %s — every node will look dead. "+
+				"Check roots config (routes/main/exported_api/keep).\n", ref)
+	}
+	reach.Compute(g, roots)
+	return g, nil
 }
