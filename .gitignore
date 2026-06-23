@@ -1,0 +1,4 @@
+/arch-diff
+/dist/
+*.test
+.cache/

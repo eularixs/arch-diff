@@ -1,0 +1,18 @@
+layers:
+  handler: "internal/**/handler"
+  service: "internal/**/service"
+  repo:    "internal/**/repo"
+  domain:  "internal/domain/**"
+  infra:   "internal/infra/**"
+
+roots:
+  routes: true          # treat registered HTTP routes as roots
+  main:   true          # treat func main as root
+  exported_api: false   # set true for library modules
+  keep:                 # allowlist for reflective/known entrypoints
+    - "internal/jobs/*.Register"
+
+ignore:
+  - "**/*_test.go"
+  - "**/mock_*.go"
+  - "vendor/**"
