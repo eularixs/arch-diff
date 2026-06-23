@@ -31,10 +31,36 @@ arch-diff --dead --head HEAD                                # full dead-code aud
 
 Report-only: exit code is always 0 in v1. Gating is arch-lint's job, not this.
 
+## GitHub Action
+
+Add the action to any Go repo to get a structural-diff comment on every PR,
+edited in place on each push:
+
+```yaml
+# .github/workflows/arch-diff.yml
+name: arch-diff
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  arch-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: eularixs/arch-diff@v0.1.0
+        with:
+          base: ${{ github.event.pull_request.base.ref }}
+```
+
+See `docs/examples/arch-diff-workflow.yml`.
+
 ## Config
 
 See `arch-diff.example.yaml` (layers, roots, ignore). Reuses archview layer rules
-where possible.
+where possible. Built graphs are cached by commit SHA (override the location with
+`ARCH_DIFF_CACHE`, disable with `ARCH_DIFF_NO_CACHE`).
 
 ## License
 

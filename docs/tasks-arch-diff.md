@@ -1,6 +1,6 @@
 # Tasks — arch-diff
 
-> Dibuat: 2026-06-23 06:24 WIB · Status: SCAFFOLD ready, logic stubbed.
+> Dibuat: 2026-06-23 06:24 WIB · Status: M1–M5 DONE (engine, diff, dead-code, mermaid, Action, cache). Verified e2e.
 > Repo: `eularixs/arch-diff` · Depends: `eularixs/archview` (replace => ../gostruct)
 > Spec: `docs/prd-arch-diff.md`. Verifiable lokal (go ada).
 
@@ -37,37 +37,37 @@ ga reachable). Yang kurang dari archview buat arch-diff:
 - [ ] M1.4 Example fixture repo (`testdata/`) dua commit: base + head.
 
 ## M2 — Stable IDs + layer-crossing
-- [ ] M2.1 Verify DoD: tambah baris kosong di atas func → diff KOSONG.
-- [ ] M2.2 Verify: pindah method ke file lain tanpa ubah logic → diff KOSONG.
-- [ ] M2.3 Layer resolution dari config globs (PRD §11) + `--only-crossing` filter.
+- [x] M2.1 Verify DoD: tambah baris kosong di atas func → diff KOSONG.
+- [x] M2.2 Verify: pindah method ke file lain tanpa ubah logic → diff KOSONG.
+- [x] M2.3 Layer resolution dari config globs (PRD §11) + `--only-crossing` filter.
 - [x] M2.4 Edge layer-crossing = From.Layer != To.Layer. Surface new + removed.
-- [ ] M2.5 Body-hash "Changed": ubah body doang → cuma node itu Changed.
-- [ ] M2.6 YAML config loader (gopkg.in/yaml.v3) — ganti config.Load stub.
+- [x] M2.5 Body-hash "Changed": ubah body doang → cuma node itu Changed.
+- [x] M2.6 YAML config loader (gopkg.in/yaml.v3) — ganti config.Load stub.
 
 ## M3 — Roots + reachability + dead-code (CORE, gabungan dead-flow)
-- [ ] M3.1 Butuh G1 (raw graph). `reach.Roots` resolve routes/main/exported_api/keep.
-- [ ] M3.2 Validasi root set non-empty → warn keras kalau kosong (PRD §15).
+- [x] M3.1 Butuh G1 (raw graph). `reach.Roots` resolve routes/main/exported_api/keep.
+- [x] M3.2 Validasi root set non-empty → warn keras kalau kosong (PRD §15).
 - [x] M3.3 `reach.Compute` BFS (UDAH ada di scaffold) jalan di base + head.
 - [x] M3.4 (core logic in diff.Diff; depends on G2 root refinement)
   - Diff reachable-set: **Newly dead** (reachable base, dead head) +
       **Revived** (dead base, reachable head). Newly-dead = headline.
-- [ ] M3.5 `--dead` audit mode: HEAD-only, list semua dead per layer.
-- [ ] M3.6 Honor `keep` allowlist + ignore globs (test, mock, vendor) — ga pernah
+- [x] M3.5 `--dead` audit mode: HEAD-only, list semua dead per layer.
+- [x] M3.6 Honor `keep` allowlist + ignore globs (test, mock, vendor) — ga pernah
       dilaporin dead.
-- [ ] M3.7 `--only-dead` filter.
+- [x] M3.7 `--only-dead` filter.
 
 ## M4 — Renderer (markdown + mermaid)
-- [ ] M4.1 Sectioned report (PRD §10): Newly dead, New layer-crossing edge dengan
+- [x] M4.1 Sectioned report (PRD §10): Newly dead, New layer-crossing edge dengan
       before/after path, Changed, Revived, New/Removed node.
-- [ ] M4.2 Mermaid subgraph region yang berubah, dead node style muted.
-- [ ] M4.3 No-change → laporan 1 baris.
+- [x] M4.2 Mermaid subgraph region yang berubah, dead node style muted.
+- [x] M4.3 No-change → laporan 1 baris.
 
 ## M5 — GitHub Action + cache
-- [ ] M5.1 Action: jalan di PR, post markdown sebagai comment, **edit in-place**
+- [x] M5.1 Action: jalan di PR, post markdown sebagai comment, **edit in-place**
       tiap push (cari comment by marker, update).
-- [ ] M5.2 Cache serialized graph + reachable-set by SHA. Base branch dihitung
+- [x] M5.2 Cache serialized graph + reachable-set by SHA. Base branch dihitung
       sekali, reuse.
-- [ ] M5.3 Validasi DoD: 1 comment per PR, ke-update tiap push.
+- [x] M5.3 Validasi DoD: 1 comment per PR, ke-update tiap push.
 
 ## Definition of Done (dari PRD §14 — checklist verifikasi)
 - [ ] Baris kosong di atas func → diff kosong.

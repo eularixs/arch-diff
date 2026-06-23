@@ -71,7 +71,7 @@ func buildAndReach(repo, ref string, cfg config.Config) (*model.Graph, error) {
 		return nil, err
 	}
 	defer cleanup()
-	g, err := loader.BuildGraph(wt, cfg)
+	g, err := loader.BuildGraphCached(wt, cfg)
 	if err != nil {
 		return nil, err
 	}

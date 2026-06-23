@@ -1,0 +1,17 @@
+# Drop this into .github/workflows/ of any Go repo to get an arch-diff PR comment.
+name: arch-diff
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  arch-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # arch-diff needs both refs
+      - uses: eularixs/arch-diff@v0.1.0
+        with:
+          base: ${{ github.event.pull_request.base.ref }}
+          # config: arch-diff.yaml
